@@ -1,10 +1,13 @@
 import tempfile
+import io
 import uuid
-import cv2
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
+import numpy as np
+import matplotlib.pyplot as plt
+from PIL import Image
 
 from anomalib.engine import Engine
 from anomalib.models import Patchcore
@@ -74,28 +77,28 @@ async def predict(
 
 @app.get("/anomaly_map/{uid}")
 async def get_anomaly_map(uid: str):
-    """Return anomaly map by yid as PNG."""
+    """Return anomaly map by uid as PNG (без OpenCV)."""
     if uid not in results_store:
         raise HTTPException(status_code=404, detail="ID not found")
 
     anomaly_map = results_store[uid]["anomaly_map"]
 
-    # нормализуем [0,1] -> [0,255]
-    anomaly_map = np.squeeze(anomaly_map)  # убираем лишние оси (1,H,W) -> (H,W)
+    # Убираем лишние оси
+    anomaly_map = np.squeeze(anomaly_map)
 
-    # нормализация в диапазон [0,255]
-    anomaly_map_norm = cv2.normalize(anomaly_map, None, 0, 255, cv2.NORM_MINMAX) # type: ignore
-
-    # перевод в uint8
+    # Нормализация [0,1] -> [0,255]
+    anomaly_map_norm = (255 * (anomaly_map - anomaly_map.min()) /
+                        (anomaly_map.max() - anomaly_map.min() + 1e-8))
     anomaly_map_uint8 = anomaly_map_norm.astype(np.uint8)
 
-    # применяем цветовую карту
-    anomaly_map_color = cv2.applyColorMap(anomaly_map_uint8, cv2.COLORMAP_JET)
+    # Применяем colormap через matplotlib
+    cmap = plt.get_cmap("jet")
+    anomaly_map_color = cmap(anomaly_map_uint8 / 255.0)  # RGBA в [0,1]
+    anomaly_map_rgb = (anomaly_map_color[:, :, :3] * 255).astype(np.uint8)
 
-    _, img_bytes = cv2.imencode(".png", anomaly_map_color)
-    return Response(content=img_bytes.tobytes(), media_type="image/png")
+    # В Pillow -> PNG в память
+    img = Image.fromarray(anomaly_map_rgb)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
 
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
+    return Response(content=buf.getvalue(), media_type="image/png")
