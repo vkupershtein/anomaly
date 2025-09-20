@@ -147,9 +147,9 @@ nbconvert==7.16.6
 nbformat==5.10.4
 nbsphinx==0.9.6
 nest-asyncio==1.6.0
-networkx==3.5
+networkx
 ninja==1.13.0
-nncf==2.18.0
+nncf
 nodeenv==1.9.1
 notebook==7.4.5
 notebook-shim==0.2.4
