@@ -11,7 +11,6 @@ from PIL import Image
 
 from anomalib.engine import Engine
 from anomalib.models import Patchcore
-import uvicorn
 
 # === Initialize FastAPI ===
 app = FastAPI(title="Anomaly Detection API")
