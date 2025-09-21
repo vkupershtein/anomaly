@@ -16,7 +16,7 @@ from anomalib.models import Patchcore
 app = FastAPI(title="Anomaly Detection API")
 
 # === Загружаем модель один раз при старте ===
-ckpt_path = "notebooks/results/Patchcore/hackathon/latest/weights/lightning/model.ckpt"
+ckpt_path = "model/model.ckpt"
 
 pre_processor = Patchcore.configure_pre_processor(image_size=(256, 256))
 
