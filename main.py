@@ -88,9 +88,10 @@ async def predict(
     # сохраняем в store
     uid = str(uuid.uuid4())
     results_store[uid] = {
-        "score": score,
+        "score": score * 1.67,
         "label": label,
-        "anomaly_map": anomaly_map
+        "anomaly_map": anomaly_map,
+        "image": img
     }
 
     return PredictResponse(id=uid, score=score, label=label)
@@ -98,28 +99,22 @@ async def predict(
 
 @app.get("/anomaly_map/{uid}")
 async def get_anomaly_map(uid: str):
-    """Return anomaly map by uid as PNG (without OpenCV)."""
+    """Return anomaly map overlay on image."""
     if uid not in results_store:
         raise HTTPException(status_code=404, detail="ID not found")
 
     anomaly_map = results_store[uid]["anomaly_map"]
+    base_img = results_store[uid]["image"]
 
-    # Remove axis
+    # Normalized [0,255]
     anomaly_map = np.squeeze(anomaly_map)
-
-    # Normalization [0,1] -> [0,255]
-    anomaly_map_norm = (255 * (anomaly_map - anomaly_map.min()) /
-                        (anomaly_map.max() - anomaly_map.min() + 1e-8))
+    anomaly_map_norm = cv2.normalize(anomaly_map, None, 0, 255, cv2.NORM_MINMAX) # type: ignore
     anomaly_map_uint8 = anomaly_map_norm.astype(np.uint8)
 
-    # Применяем colormap через matplotlib
-    cmap = plt.get_cmap("jet")
-    anomaly_map_color = cmap(anomaly_map_uint8 / 255.0)  # RGBA в [0,1]
-    anomaly_map_rgb = (anomaly_map_color[:, :, :3] * 255).astype(np.uint8)
+    # Colored
+    anomaly_map_color = cv2.applyColorMap(anomaly_map_uint8, cv2.COLORMAP_JET)
 
-    # В Pillow -> PNG в память
-    img = Image.fromarray(anomaly_map_rgb)
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
+    overlay = cv2.addWeighted(base_img, 0.6, anomaly_map_color, 0.4, 0)
 
-    return Response(content=buf.getvalue(), media_type="image/png")
+    _, img_bytes = cv2.imencode(".png", overlay)
+    return Response(content=img_bytes.tobytes(), media_type="image/png")
