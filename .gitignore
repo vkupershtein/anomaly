@@ -8,5 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
-notebooks
+*.png
+*.jpeg
+notebooks/.ipynb_checkpoints
 results
